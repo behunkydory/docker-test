@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # 1. 채팅 서버 (Backend)
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db # DB가 먼저 켜져야 함
+
+  # 2. 웹 서버 (Frontend)
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+
+  # 3. 데이터베이스 (MongoDB) - 추가됨!
+  db:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db # 데이터 보관용 가방
+
+volumes:
+  mongo-data: # 컨테이너가 삭제되어도 데이터는 남도록 함

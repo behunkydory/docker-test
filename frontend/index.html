@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>보안 인증 채팅</title>
+    <style>
+        /* ... (기존 스타일과 유사하지만 로그인 폼 위주로 수정) ... */
+        body {
+            font-family: sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            padding: 50px;
+        }
+
+        #auth-box {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        input {
+            width: 90%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+
+        .btn-login {
+            background: #4dabf7;
+            color: white;
+        }
+
+        .btn-reg {
+            background: #adb5bd;
+            color: white;
+        }
+
+        #main-container {
+            display: none;
+            width: 800px;
+            height: 500px;
+            background: white;
+            display: none;
+        }
+
+        /* JS에서 제어 */
+        /* ... (기존 채팅창 스타일 유지) ... */
+    </style>
+</head>
+
+<body>
+
+    <div id="auth-box">
+        <h3>🔐 보안 채팅</h3>
+        <input id="user-id" placeholder="아이디" />
+        <input id="user-pw" type="password" placeholder="비밀번호" />
+        <button class="btn-login" onclick="auth('login')">로그인</button>
+        <button class="btn-reg" onclick="auth('register')">회원가입</button>
+    </div>
+
+    <div id="main-container" style="display:none; width:900px; height:600px; border:1px solid #ddd; background:white;">
+        <div style="display:flex; height:100%;">
+            <div id="sidebar" style="width:250px; border-right:1px solid #eee;">
+                <h4 style="padding:10px;">접속자</h4>
+                <ul id="user-list"></ul>
+            </div>
+            <div id="chat-area" style="flex:1; display:flex; flex-direction:column;">
+                <div id="chat-header" style="padding:15px; border-bottom:1px solid #eee;">상대를 선택하세요</div>
+                <div id="chat-box" style="flex:1; overflow-y:auto; padding:20px; background:#f9f9f9;"></div>
+                <div style="padding:15px; display:flex; gap:10px;">
+                    <input id="msg-input" style="flex:1; padding:10px;" />
+                    <button onclick="send()" style="width:80px;">전송</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script>
+        const socket = io("http://localhost:3000");
+        let myToken = "";
+        let myName = "";
+        let currentPartnerId = null;
+
+        // 인증 함수
+        function auth(type) {
+            const username = document.getElementById('user-id').value;
+            const password = document.getElementById('user-pw').value;
+            socket.emit('auth', { type, username, password });
+        }
+
+        socket.on('auth_success', (data) => alert(data.message));
+        socket.on('auth_error', (msg) => alert(msg));
+
+        socket.on('login_success', (data) => {
+            myToken = data.token;
+            myName = data.username;
+            document.getElementById('auth-box').style.display = 'none';
+            document.getElementById('main-container').style.display = 'block';
+            document.getElementById('main-container').style.display = 'flex';
+        });
+
+        // 유저 클릭 시
+        function selectUser(id, name) {
+            currentPartnerId = id;
+            document.getElementById('chat-header').innerText = name + "님과 대화 중";
+            socket.emit('get history', { token: myToken, targetName: name });
+        }
+
+        socket.on('user list', (users) => {
+            const list = document.getElementById('user-list');
+            list.innerHTML = "";
+            for (let id in users) {
+                if (id === socket.id) continue;
+                const li = document.createElement('li');
+                li.innerText = users[id];
+                li.onclick = () => selectUser(id, users[id]);
+                li.style.cursor = "pointer";
+                li.style.padding = "10px";
+                list.appendChild(li);
+            }
+        });
+
+        socket.on('load history', (history) => {
+            const box = document.getElementById('chat-box');
+            box.innerHTML = "";
+            history.forEach(h => {
+                const div = document.createElement('div');
+                div.innerText = `${h.senderName}: ${h.msg}`;
+                div.style.textAlign = (h.senderName === myName) ? 'right' : 'left';
+                box.appendChild(div);
+            });
+        });
+
+        function send() {
+            const msg = document.getElementById('msg-input').value;
+            socket.emit('private message', { token: myToken, toId: currentPartnerId, msg });
+            document.getElementById('msg-input').value = "";
+        }
+
+        socket.on('chat message', (data) => {
+            const div = document.createElement('div');
+            div.innerText = `${data.fromName}: ${data.msg}`;
+            div.style.textAlign = (data.fromName === myName) ? 'right' : 'left';
+            document.getElementById('chat-box').appendChild(div);
+        });
+    </script>
+</body>
+
+</html>
